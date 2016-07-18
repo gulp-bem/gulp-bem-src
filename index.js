@@ -1,14 +1,21 @@
+const assert = require('assert');
+
+const BemEntityName = require('bem-entity-name');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
 const toArray = require('stream-to-array');
+const thru = require('through2');
+const read = require('gulp-read');
 
 module.exports = src;
 
+src.filesToStream = filesToStream;
+src.harvest = harvest;
+
 /*
-src(decl: Tenorok[], techs: String|String[], [, options: {
+src(sources: String[], decl: BemEntityName[], techs: String|String[], [, options: {
   config: ?BemConfig, // Should be loaded from .bemrc by default
-  sources: ?String[], // Should use levels from config by default and throw if nothing found
   techAliases: ?Object<String,String[]> // Should use aliases from .bemrc if any
 
   // vfs.src options:
@@ -25,30 +32,74 @@ src(decl: Tenorok[], techs: String|String[], [, options: {
 */
 
 /**
- * @param {Tenorok[]} decl - entities to harvest
+ * @param {String[]} sources - levels to use to search files
+ * @param {BemEntityName[]} decl - entities to harvest
  * @param {String|String[]} techs - desired techs
  * @param {Object} options
  * @param {?BemConfig} options.config - config to use instead of default .bemrc
- * @param {?(String[])} options.sources - levels to use to search files
  * @param {?Object<String, String[]>} options.techAliases - tech to aliases map to fit needs for everyone
  * @returns {Stream<Vinyl>} - Just a typical stream of gulp-like file objects
  */
-function src(decl, techs, options) {
-    const config = options.config || bemConfig();
+function src(sources, decl, techs, options) {
+    assert(Array.isArray(sources) && sources.length, 'Sources required to get some files');
+    assert(Array.isArray(decl) && decl.length, 'Declaration required to harvest some entities');
+    assert((typeof techs === 'string' || Array.isArray(techs)) && techs.length, 'Techs required to build exactly some');
+    Array.isArray(techs) || (techs = [techs]);
 
-    config.levelMap()
+    options || (options = {});
+
+    const config = options.config || bemConfig();
+    const orderedFilesPromise = Promise.resolve(config.levelMap ? config.levelMap() : {})
         // walk levels
-        .then(levelMap => {
-            const levels = options.sources || Object.keys(levelMap);
-            return toArray(walk(levels, {levels: levelMap}));
-        })
-        .then(introspetion => {
-            console.log(introspetion);
+        .then(levelMap => toArray(walk(sources, {levels: levelMap})))
+        .then(introspection => introspection.map(fileEntity =>
+            (fileEntity.entity = new BemEntityName(fileEntity.entity), fileEntity)))
+        .then(introspection => {
+            // console.log('decl', _multiflyTechs(decl, techs).map(f => f.entity.id + '.' + f.tech));
+            return harvest(introspection, sources, _multiflyTechs(decl, techs));
         });
-    // harvest(introspetion, );
+
+    return filesToStream(orderedFilesPromise, options);
 }
 
-src.harvest = harvest;
+/**
+ * @param {BemFile[]|Promise<BemFile[]>} files
+ * @param {Object} options - see src options
+ * @returns {Stream<Vinyl>}
+ */
+function filesToStream(files, options) {
+    const stream = thru.obj();
+
+    options = Object.assign({
+        read: true,
+//        bem: false
+    }, options);
+
+    Promise.resolve(files)
+        .then(files => {
+            files.forEach(file => {
+                const vf = new File({
+//                    base: file.level,
+                    path: file.path,
+                    contents: null
+                });
+                // if (options.bem) {
+                //     vf.level = file.level;
+                //     vf.tech = file.tech;
+                // }
+                stream.push(vf)
+            });
+            stream.push(null);
+        })
+        .catch(err => {
+            stream.emit('error', err);
+            stream.push(null);
+        });
+
+    return options.read
+        ? stream.pipe(read())
+        : stream;
+}
 
 /**
  * @param {Array<{entity: Tenorok, level: String, tech: String, path: String}>} introspection - unordered file-entities list
@@ -57,17 +108,17 @@ src.harvest = harvest;
  * @returns {Array<{entity: Tenorok, level: String, tech: String, path: String}>} - resulting ordered file-entities list
  */
 function harvest(introspection, levels, decl) {
-    const hash = fileEntity => fileEntity.entity.id + '.' + fileEntity.tech;
+    const hash = fileEntity => `${fileEntity.entity.id}.${fileEntity.tech}`;
     const declIndex = _buildIndex(decl, hash);
 
     const entityInIndex = file => declIndex[hash(file)] !== undefined;
     return introspection
         .filter(entityInIndex)
         .filter(file => levels.indexOf(file.level) !== -1)
-        .sort((f1, f2) => f1.entity.id === f2.entity.id
+        .sort((f1, f2) => hash(f1) === hash(f2)
             ? levels.indexOf(f1.level) - levels.indexOf(f2.level)
-            : declIndex[f2.entity.id] - declIndex[f1.entity.id]);
-};
+            : declIndex[hash(f1)] - declIndex[hash(f2)]);
+}
 
 /**
  * @param {Array<{entity: Tenorok, tech: String}>} list - List of tenoroks
@@ -78,4 +129,13 @@ function _buildIndex(list, hash) {
         res[hash(fileEntity)] = idx;
         return res;
     }, {});
+}
+
+function _multiflyTechs(decl, techs) {
+    return decl.reduce((res, fileEntity) => {
+        fileEntity.tech
+            ? res.push(fileEntity)
+            : techs.forEach(tech => res.push(Object.assign({tech}, fileEntity)));
+        return res;
+    }, []);
 }

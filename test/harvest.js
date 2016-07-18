@@ -62,6 +62,7 @@ function checkHarvest(opts) {
     lib.harvest(opts.files, opts.levels, opts.decl).map(normalize)
         .should.eql(opts.result.map(normalize));
 }
+
 function makeFileEntity(filepath) {
     const level = filepath.split('/')[0];
     const tech = path.basename(filepath).split('.').slice(1).join('.');
