@@ -28,8 +28,13 @@
     "vinyl-fs": "2.3.1"
   },
   "devDependencies": {
+    "bem-entity-name": "bem-sdk/bem-entity-name#544c82670430bfff2e5e179a89ffe9537918eb91",
+    "bem-naming": "^1.0.1",
+    "chai": "^3.5.0",
     "eslint": "2.6.0",
-    "eslint-config-pedant": "0.1.1"
+    "eslint-config-pedant": "0.1.1",
+    "mocha": "^2.5.3",
+    "sinon": "^1.17.4"
   },
   "scripts": {
     "test": "npm run lint",

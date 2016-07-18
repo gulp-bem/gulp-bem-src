@@ -1,114 +1,81 @@
-'use strict';
-
-const fs = require('fs');
-
-const through = require('through2');
-const sort = require('sort-stream2')
-
+const bemConfig = require('bem-config');
 const walk = require('bem-walk');
-const bemDeps = require('@bem/deps');
-const toArray = require('stream-to-array');
 const File = require('vinyl');
+const toArray = require('stream-to-array');
+
+module.exports = src;
+
+/*
+src(decl: Tenorok[], techs: String|String[], [, options: {
+  config: ?BemConfig, // Should be loaded from .bemrc by default
+  sources: ?String[], // Should use levels from config by default and throw if nothing found
+  techAliases: ?Object<String,String[]> // Should use aliases from .bemrc if any
+
+  // vfs.src options:
+  buffer: Boolean=true,
+  read: Boolean=true,
+  since: ?(Date|Number),
+  stripBOM: Boolean=true,
+  passthrough: Boolean=false,
+  sourcemaps: Boolean=false,
+  followSymlinks: Boolean=true, // we should pass it to bem-walk?
+  dots: Boolean=false // pointless?,
+  // etc.
+}]): Stream<Vinyl>
+*/
 
 /**
- * map bem-deps by bem-walk-entities
- * @param  {Array} decl          – bem-deps [{ block, elem, modName, modVal }, ...]
- * @param  {Array} fsEntities    – bem-walk [{ entity: { block, elem, modName, modVal }, tech }, ...]
- * @param  {String[]} extensions - tech name: 'js' || 'css' || 'bemhtml' || ...
- * @param  {Function} cb         - callback with filtred decls with files
+ * @param {Tenorok[]} decl - entities to harvest
+ * @param {String|String[]} techs - desired techs
+ * @param {Object} options
+ * @param {?BemConfig} options.config - config to use instead of default .bemrc
+ * @param {?(String[])} options.sources - levels to use to search files
+ * @param {?Object<String, String[]>} options.techAliases - tech to aliases map to fit needs for everyone
+ * @returns {Stream<Vinyl>} - Just a typical stream of gulp-like file objects
  */
-function filterDeps(decl, fsEntities, extensions, cb) {
-    var entitiesWithTech = [];
+function src(decl, techs, options) {
+    const config = options.config || bemConfig();
 
-    decl.forEach(entity => {
-        var ewt = fsEntities.filter(function(file) {
-            if(extensions.indexOf('.' + file.tech) === -1) { return false; }
-            if(file.entity.block !== entity.block) { return false; }
-            if(file.entity.elem !== entity.elem) { return false; }
-            if(file.entity.modName !== entity.modName) { return false; }
-            // True modifiers are truly outrageous.
-            if(file.entity.modVal === true && !entity.hasOwnProperty('modVal')) { return true; }
-            if(entity.modVal === true && !file.entity.hasOwnProperty('modVal')) { return true; }
-
-            if(file.entity.modVal !== entity.modVal) { return false; }
-            return true;
+    config.levelMap()
+        // walk levels
+        .then(levelMap => {
+            const levels = options.sources || Object.keys(levelMap);
+            return toArray(walk(levels, {levels: levelMap}));
+        })
+        .then(introspetion => {
+            console.log(introspetion);
         });
-
-        entitiesWithTech = [].concat(entitiesWithTech, ewt);
-    });
-
-    cb(null, entitiesWithTech);
+    // harvest(introspetion, );
 }
 
-module.exports = function src(opts) {
-    // todo: make it asserts
-    if (!opts.levels || !Array.isArray(opts.levels)) {
-        throw new Error('`levels` property should be an array');
-    }
-    if (!opts.tech) {
-        throw new Error('Tech is required');
-    }
+src.harvest = harvest;
 
-    opts || (opts = {});
+/**
+ * @param {Array<{entity: Tenorok, level: String, tech: String, path: String}>} introspection - unordered file-entities list
+ * @param {String[]} levels - ordered levels' paths list
+ * @param {Tenorok[]} decl - resolved and ordered declaration
+ * @returns {Array<{entity: Tenorok, level: String, tech: String, path: String}>} - resulting ordered file-entities list
+ */
+function harvest(introspection, levels, decl) {
+    const hash = fileEntity => fileEntity.entity.id + '.' + fileEntity.tech;
+    const declIndex = _buildIndex(decl, hash);
 
-    var levels = opts.levels || [];
-    var decl = opts.decl || [];
-    var extensions = opts.extensions || [opts.tech];
-    //TODO: take it from introspect
-    var deps = toArray(bemDeps.load({ levels: levels }));
-    var introspection = toArray(walk(levels, { levels: opts.config })
-        .pipe(sort(function(a, b) {
-            return levels.indexOf(a.level) - levels.indexOf(b.level);
-        })));
-
-    var stream = through.obj();
-
-    Promise.all([
-        deps,
-        introspection
-    ])
-    .then(function(res) {
-        var relations = res[0];
-        var fsEntities = res[1];
-        var resolvedDecl = bemDeps.resolve(decl, relations);
-
-        filterDeps(resolvedDecl.entities, fsEntities, extensions, function(err, sourceFiles) {
-            if (err) {
-                stream.emit('error', err)
-                return stream.push(null);
-            }
-
-            var que = {};
-            var length = sourceFiles.length;
-            if (!length) {
-                stream.push(new File({path: extensions[0], contents: new Buffer('')}));
-                stream.push(null);
-            }
-            // push files to stream in same order they come
-            function pushFilesFromQue() {
-                for (var j = 0; j <= length; j++) {
-                    var file = que[j];
-                    if (!file) { continue; }
-                    if (!file.contents) { break; }
-                    stream.push(file);
-                    que[j] = undefined;
-                }
-                if (j > length) { stream.push(null); }
-            }
-            sourceFiles.forEach(function(source, i) {
-                var file = new File({path: source.path});
-                que[i] = file;
-                fs.readFile(source.path, function(err, content) {
-                    file.contents = content;
-                    pushFilesFromQue(sourceFiles.length);
-                });
-            });
-        });
-    })
-    .catch(function(err) {
-        stream.emit('error', err)
-        stream.push(null);
-    });
-
-    return stream;
+    const entityInIndex = file => declIndex[hash(file)] !== undefined;
+    return introspection
+        .filter(entityInIndex)
+        .filter(file => levels.indexOf(file.level) !== -1)
+        .sort((f1, f2) => f1.entity.id === f2.entity.id
+            ? levels.indexOf(f1.level) - levels.indexOf(f2.level)
+            : declIndex[f2.entity.id] - declIndex[f1.entity.id]);
 };
+
+/**
+ * @param {Array<{entity: Tenorok, tech: String}>} list - List of tenoroks
+ * @returns {Object<String, Number>} - Entity id to sort order
+ */
+function _buildIndex(list, hash) {
+    return list.reduce((res, fileEntity, idx) => {
+        res[hash(fileEntity)] = idx;
+        return res;
+    }, {});
+}
