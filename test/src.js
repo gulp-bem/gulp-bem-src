@@ -56,7 +56,3 @@ function makeEntity(str) {
     const entity = new BemEntityName(BemNaming.parse(entityName));
     return tech ? {entity, tech} : {entity};
 }
-function normalize(file) {
-//    file.entity.id && (file.entity = '[object BemEntityName:' + file.entity.id + ']');
-    return file;
-}
