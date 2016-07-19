@@ -35,10 +35,10 @@ function checkSrc(opts) {
             opts.levels.reduce((res, path) => (res[path] = {}, res), {})),
     };
 
-    return lib(opts.levels, opts.decl, opts.techs, {config})
+    return toArray(lib(opts.levels, opts.decl, opts.techs, {config}))
         .then(res => {
-            console.log(res.map(normalize))
-            res.map(normalize).should.eql(opts.result.map(normalize));
+            res.map(f => ({path: f.path, contents: f.contents && String(f.contents)}))
+                .should.eql(opts.result.map(f => ({path: f.path, contents: files[f.path]})));
         });
 }
 
@@ -56,7 +56,7 @@ function makeEntity(str) {
     const entity = new BemEntityName(BemNaming.parse(entityName));
     return tech ? {entity, tech} : {entity};
 }
-function normalize(fileEntity) {
-    fileEntity.entity.id && (fileEntity.entity = '[object BemEntityName:' + fileEntity.entity.id + ']');
-    return fileEntity;
+function normalize(file) {
+//    file.entity.id && (file.entity = '[object BemEntityName:' + file.entity.id + ']');
+    return file;
 }

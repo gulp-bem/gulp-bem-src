@@ -23,7 +23,7 @@
     "bem-walk": "1.0.0-alpha1",
     "sort-stream2": "1.0.0",
     "stream-to-array": "2.2.0",
-    "through2": "2.0.0",
+    "through2": "^2.0.0",
     "vinyl": "1.1.0",
     "vinyl-fs": "2.3.1"
   },
