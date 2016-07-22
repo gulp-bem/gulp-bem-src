@@ -1,12 +1,20 @@
 const assert = require('assert');
 
+const fsp = require('mz/fs');
+
+const BemGraph = require('bem-graph').BemGraph;
 const BemEntityName = require('bem-entity-name');
+const bemDecl = require('bem-decl');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
 const toArray = require('stream-to-array');
 const thru = require('through2');
 const read = require('gulp-read');
+const bubbleStreamError = require('bubble-stream-error');
+
+const bemDeclNormalize = bemDecl.normalizer('normalize2');
+const depsFulfill = require('@bem/deps/lib/formats/deps.js/fulfill.js');
 
 module.exports = src;
 
@@ -32,9 +40,19 @@ src(sources: String[], decl: BemEntityName[], techs: String|String[], [, options
 */
 
 /**
+ * - Получаем слепок файловой структуры с уровней
+ * - Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
+ * - Получаем граф с помощью bem-deps
+ * - Сортируем по уровням и раскрываем декларацию с помощью графа
+ * - Преобразуем технологии зависимостей в декларации в технологии файловой системы
+ * - Формируем упорядоченный список файлов по раскрытой декларации и интроспекции
+ * - Читаем файлы из списка в поток
+ *
+ * techAliases: {[depsTech]: fileTechs}
+ *
  * @param {String[]} sources - levels to use to search files
  * @param {BemEntityName[]} decl - entities to harvest
- * @param {String|String[]} techs - desired techs
+ * @param {String} tech - desired tech
  * @param {Object} options
  * @param {?BemConfig} options.config - config to use instead of default .bemrc
  * @param {?Object<String, String[]>} options.techAliases - tech to aliases map to fit needs for everyone
@@ -49,17 +67,96 @@ function src(sources, decl, techs, options) {
     options || (options = {});
 
     const config = options.config || bemConfig();
-    const orderedFilesPromise = Promise.resolve(config.levelMap ? config.levelMap() : {})
-        // walk levels
+
+    // Получаем слепок файловой структуры с уровней
+    const introspection = Promise.resolve(config.levelMap ? config.levelMap() : {})
         .then(levelMap => toArray(walk(sources, {levels: levelMap})))
-        .then(introspection => introspection.map(fileEntity =>
-            (fileEntity.entity = new BemEntityName(fileEntity.entity), fileEntity)))
-        .then(introspection => {
-            // console.log('decl', _multiflyTechs(decl, techs).map(f => f.entity.id + '.' + f.tech));
-            return harvest(introspection, sources, _multiflyTechs(decl, techs));
+        .then(files => (
+            files.forEach(fe => fe.entity = new BemEntityName(fe.entity)),
+                files));
+
+    // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
+    const depsJsData = introspection.then(files =>
+        Promise.all(files
+            .filter(f => f.tech === 'deps.js')
+            .map(f => fsp.readFile(f, 'utf8')
+                .then(content => _eval(content, f.path))
+                .catch(err => null)
+                .then(content => ({
+                    data: content,
+                    level: f.level,
+                    scope: f.entity.valueOf()
+                }))
+            )))
+        // Сортируем по уровням
+        .then(files => files.sort((f1, f2) => (sources.indexOf(f1.level) - sources.indexOf(f2.level))));
+
+    // Получаем граф с помощью bem-deps
+    const graph = depsJsData.then(buildGraphByIntrospection);
+
+    // Раскрываем декларацию с помощью графа
+    const filedecl = graph
+        .then(data => {
+            const fulldecl = graph.dependenciesOf(decl, tech);
+            fulldecl.forEach(fe => fe.entity = new BemEntityName(fe.entity));
+            return fulldecl;
+        })
+        // Преобразуем технологии зависимостей в декларации в технологии файловой системы
+        .then(fulldecl => _multiflyTechs(fulldecl, techs));
+
+    // Формируем упорядоченный список файлов по раскрытой декларации и интроспекции
+    const orderedFilesPromise = Promise.all([introspection, filedecl])
+        .then(data => {
+            const introspection = data[0];
+            const filedecl = data[1];
+
+            return harvest(introspection, sources, filedecl);
         });
 
+    // Читаем файлы из списка в поток
     return filesToStream(orderedFilesPromise, options);
+}
+
+// bem-deps shit
+function buildGraphByIntrospection(files) {
+    const graph = new BemGraph();
+
+    deps.read(data)
+        // normalized deps
+        .forEach(item => {
+            // item.entity // kto
+            // item.dependOn // ot checgo
+            // item.ordered
+            graph.vertex(item.entity)
+                .dependOn(item.dependOn);
+        });
+
+    return graph;
+
+    files.forEach(f => {
+        const depsData = depsNormalize(f.data, f.scope); // DUCK
+        depsData.forEach(chunk => {
+            console.log(chunk);
+            chunk.shouldDeps.forEach(ent => ent);
+            chunk.mustDeps.forEach(ent => ent);
+        });
+//        console.log('deps', depsData);
+    });
+}
+
+function depsNormalize(data, fileScope) {
+    return [].concat(data).map(chunk => {
+        ['mustDeps', 'shouldDeps', 'noDeps'].forEach(function (depsType) {
+            if (!chunk[depsType]) return (chunk[depsType] = []);
+
+            const scope = Object.assign({}, fileScope, chunk);
+            console.log('!!');
+            chunk[depsType] = bemDeclNormalize(chunk[depsType]);
+            console.log('!!', chunk[depsType].map(e => depsFulfill(e, scope)));
+        });
+
+        return chunk;
+    });
 }
 
 /**
@@ -96,18 +193,24 @@ function filesToStream(files, options) {
             stream.push(null);
         });
 
-    return options.read
-        ? stream.pipe(read())
-        : stream;
+    var result = stream;
+
+    if (options.read) {
+        const reader = read();
+        bubbleStreamError(stream, reader);
+        result = stream.pipe(reader);
+    }
+
+    return result;
 }
 
 /**
- * @param {Array<{entity: Tenorok, level: String, tech: String, path: String}>} introspection - unordered file-entities list
+ * @param {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} introspection - unordered file-entities list
  * @param {String[]} levels - ordered levels' paths list
  * @param {Tenorok[]} decl - resolved and ordered declaration
- * @returns {Array<{entity: Tenorok, level: String, tech: String, path: String}>} - resulting ordered file-entities list
+ * @returns {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} - resulting ordered file-entities list
  */
-function harvest(introspection, levels, decl) {
+function harvest(introspection, levels, decl/*: Array<{entity, tech}>*/) {
     const hash = fileEntity => `${fileEntity.entity.id}.${fileEntity.tech}`;
     const declIndex = _buildIndex(decl, hash);
 
