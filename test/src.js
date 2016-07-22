@@ -11,20 +11,38 @@ const lib = require('../');
 const chai = require('chai');
 chai.should();
 
-it('should return something', function() {
+it('should return files for entities in decl without deps', function() {
     return checkSrc({
         files: ['l1/b2/b2.js', 'l2/b1/b1.js', 'l2/b1/b1.css', 'l1/b1/b1.js', 'l2/b1/b1.es'],
         decl: ['b1', 'b2'],
         levels: ['l1', 'l2'],
         techs: ['js', 'es'],
-        result: ['l1/b1/b1.js', 'l2/b1/b1.js', 'l2/b1/b1.es', 'l1/b2/b2.js']
+        result: ['l1/b1/b1.js', 'l2/b1/b1.js', 'l2/b1/b1.es', 'l1/b2/b2.js'],
+        read: true
+    });
+});
+
+it.only('should return something', function() {
+    return checkSrc({
+        files: {
+            'l1/b1/b1.deps.js': `[{shouldDeps: {block: 'b2'}}]`,
+            'l1/b1/b1.js': `1`,
+            'l1/b2/b2.js': `2`
+        },
+        decl: ['b1'],
+        levels: ['l1'],
+        techs: ['js'],
+        result: ['l1/b1/b1.js', 'l1/b2/b2.js']
     });
 });
 
 afterEach(mockfs.restore);
 
 function checkSrc(opts) {
-    const files = opts.files.reduce((res, f, idx) => (res[f] = String(idx), res), {});
+    const files = Array.isArray(opts.files)
+        ? opts.files.reduce((res, f, idx) => (res[f] = String(idx), res), {})
+        : opts.files;
+        console.log(opts);
     mockfs(files);
 
     opts.decl = opts.decl.map(makeEntity);
@@ -49,10 +67,7 @@ function makeFileEntity(filepath) {
     const entity = new BemEntityName(BemNaming.parse(entityName));
     return {entity, level, tech, path: filepath};
 }
+
 function makeEntity(str) {
-    str = str.split('.');
-    const entityName = str[0];
-    const tech = str[1];
-    const entity = new BemEntityName(BemNaming.parse(entityName));
-    return tech ? {entity, tech} : {entity};
+    return new BemEntityName(BemNaming.parse(str));
 }
