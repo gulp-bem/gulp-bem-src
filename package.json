@@ -12,17 +12,21 @@
   ],
   "main": "index.js",
   "files": [
+    "deps.js",
     "index.js"
   ],
   "engines": {
     "node": ">= 4.0"
   },
   "dependencies": {
-    "@bem/deps": "bem-sdk/bem-deps#a9ec4b0e091bc82cad9a3f9ae1a0e135b2e8c572",
-    "bem-decl": "bem-sdk/bem-decl#c3fb19f7e28c59ebeaa53440f5dcda3baee875bd",
+    "bem-bundle": "^0.1.0",
+    "bem-config": "^2.0.1",
+    "bem-decl": "bem-sdk/bem-decl#v0.2.0",
+    "bem-entity-name": "0.0.1",
     "bem-graph": "bem-sdk/bem-graph#1bc3408",
     "bem-walk": "1.0.0-alpha1",
     "bubble-stream-error": "^1.0.0",
+    "gulp-read": "0.0.1",
     "mz": "^2.4.0",
     "node-eval": "^1.0.3",
     "sort-stream2": "1.0.0",
@@ -32,7 +36,6 @@
     "vinyl-fs": "2.3.1"
   },
   "devDependencies": {
-    "bem-entity-name": "bem-sdk/bem-entity-name#544c82670430bfff2e5e179a89ffe9537918eb91",
     "bem-naming": "^1.0.1",
     "chai": "^3.5.0",
     "eslint": "2.6.0",
@@ -42,7 +45,8 @@
     "sinon": "^1.17.4"
   },
   "scripts": {
-    "test": "npm run lint",
+    "pretest": "npm run lint",
+    "test": "mocha",
     "lint": "eslint ."
   }
 }

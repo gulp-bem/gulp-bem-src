@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 
 const mockfs = require('mock-fs');
 const toArray = require('stream-to-array');
@@ -10,6 +9,19 @@ const lib = require('../');
 
 const chai = require('chai');
 chai.should();
+
+describe('src', () => {
+
+// Skipped because of https://github.com/bem-sdk/bem-walk/issues/76
+it.skip('should return no files if no files', function() {
+    return checkSrc({
+        files: {l1: {}, l2: {}},
+        decl: ['b1', 'b2'],
+        levels: ['l1', 'l2'],
+        tech: 'js',
+        result: []
+    });
+});
 
 it('should return files for entities in decl without deps', function() {
     return checkSrc({
@@ -38,10 +50,11 @@ it('should return something', function() {
 });
 
 afterEach(mockfs.restore);
+});
 
 function checkSrc(opts) {
     const files = Array.isArray(opts.files)
-        ? opts.files.reduce((res, f, idx) => (res[f] = String(idx), res), {})
+        ? opts.files.reduce((res, f, idx) => { res[f] = String(idx); return res; }, {})
         : opts.files;
 
     mockfs(files);
@@ -51,7 +64,7 @@ function checkSrc(opts) {
 
     const config = {
         levelMap: () => Promise.resolve(
-            opts.levels.reduce((res, path) => (res[path] = {}, res), {})),
+            opts.levels.reduce((res, path) => { res[path] = {}; return res; }, {})),
     };
 
     return toArray(lib(opts.levels, opts.decl, opts.tech, {config, techMap: opts.techMap}))

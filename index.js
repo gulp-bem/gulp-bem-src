@@ -1,7 +1,9 @@
+'use strict';
+
 const assert = require('assert');
+const path = require('path');
 
 const BemEntityName = require('bem-entity-name');
-const bemDecl = require('bem-decl');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
@@ -10,8 +12,8 @@ const thru = require('through2');
 const read = require('gulp-read');
 const bubbleStreamError = require('bubble-stream-error');
 
-const bemDeclNormalize = bemDecl.normalizer('normalize2');
-const depsFulfill = require('@bem/deps/lib/formats/deps.js/fulfill.js');
+// const bemDeclNormalize = bemDecl.normalizer('normalize2');
+// const depsFulfill = require('@bem/deps/lib/formats/deps.js/fulfill.js');
 const deps = require('./deps');
 
 module.exports = src;
@@ -51,7 +53,7 @@ src(sources: String[], decl: BemEntityName[], techs: String|String[], [, options
  * @param {String[]} sources - levels to use to search files
  * @param {BemEntityName[]} decl - entities to harvest
  * @param {String} tech - desired tech
- * @param {Object} options
+ * @param {Object} options - options
  * @param {?BemConfig} options.config - config to use instead of default .bemrc
  * @param {?Object<String, String[]>} options.techAliases - tech to aliases map to fit needs for everyone
  * @returns {Stream<Vinyl>} - Just a typical stream of gulp-like file objects
@@ -68,8 +70,23 @@ function src(sources, decl, tech, options) {
 
     // Получаем слепок файловой структуры с уровней
     const introspection = Promise.resolve(config.levelMap ? config.levelMap() : {})
-        .then(levelMap => toArray(walk(sources, {levels: levelMap})))
-        .then(files => (files.forEach(fe => fe.entity = new BemEntityName(fe.entity)), files));
+        .then(levelMap => {
+            const intro = walk(sources, {levels: levelMap});
+
+            let hasSomeData = false;
+            intro.on('data', () => { hasSomeData = true; });
+            return new Promise((resolve, reject) => {
+                setTimeout(() => hasSomeData ||
+                    reject('bem-walk timeout. See also https://github.com/bem-sdk/bem-walk/issues/76'), 1000);
+                toArray(intro).then(resolve).catch(reject);
+            });
+        })
+        .then(files => {
+            files.forEach(fe => {
+                fe.entity = new BemEntityName(fe.entity);
+            });
+            return files;
+        });
 
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
     const depsData = introspection.then(files =>
@@ -89,7 +106,9 @@ function src(sources, decl, tech, options) {
     const filedecl = graph
         .then(graph => {
             const fulldecl = graph.dependenciesOf(decl, tech);
-            fulldecl.forEach(fe => fe.entity = new BemEntityName(fe.entity));
+            fulldecl.forEach(fe => {
+                fe.entity = new BemEntityName(fe.entity);
+            });
             return fulldecl;
         })
         // Преобразуем технологии зависимостей в декларации в технологии файловой системы
@@ -109,7 +128,7 @@ function src(sources, decl, tech, options) {
 }
 
 /**
- * @param {BemFile[]|Promise<BemFile[]>} files
+ * @param {BemFile[]|Promise<BemFile[]>} files - result of previous step © your cap
  * @param {Object} options - see src options
  * @returns {Stream<Vinyl>}
  */
@@ -117,32 +136,45 @@ function filesToStream(files, options) {
     const stream = thru.obj();
 
     options = Object.assign({
-        read: true,
-//        bem: false
+        read: true
+        // bem: false
     }, options);
 
     Promise.resolve(files)
-        .then(files => {
-            files.forEach(file => {
+        .then(files => new Promise((resolve) => {
+            let i = 0;
+            const l = files.length;
+
+            (function next() {
+                if (i >= l) {
+                    stream.push(null);
+                    resolve();
+                    return;
+                }
+
+                const file = files[i++];
                 const vf = new File({
-//                    base: file.level,
+                    base: file.level,
                     path: file.path,
                     contents: null
                 });
+
                 // if (options.bem) {
-                //     vf.level = file.level;
-                //     vf.tech = file.tech;
+                    vf.name = path.basename(file.path).split('.')[0];
+                    vf.tech = file.tech;
+                    vf.level = file.level;
                 // }
+
                 stream.push(vf);
-            });
-            stream.push(null);
-        })
+                process.nextTick(next);
+            }());
+        }))
         .catch(err => {
             stream.emit('error', err);
             stream.push(null);
         });
 
-    var result = stream;
+    let result = stream;
 
     if (options.read) {
         const reader = read();
@@ -174,6 +206,7 @@ function harvest(introspection, levels, decl/*: Array<{entity, tech}>*/) {
 
 /**
  * @param {Array<{entity: Tenorok, tech: String}>} list - List of tenoroks
+ * @param {Function} hash - Hashing function
  * @returns {Object<String, Number>} - Entity id to sort order
  */
 function _buildIndex(list, hash) {

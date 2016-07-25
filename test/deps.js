@@ -1,10 +1,9 @@
 const path = require('path');
-const fs = require('fs');
 
 const mockfs = require('mock-fs');
-const toArray = require('stream-to-array');
 const BemEntityName = require('bem-entity-name');
 const BemNaming = require('bem-naming');
+const _eval = require('node-eval');
 
 const lib = require('../deps');
 
@@ -38,7 +37,7 @@ describe('read', function() {
 
             const result = opts.result
                 .map(makeFileEntity)
-                .map(f => ({path: f.path, data: eval(opts.files[f.path])}));
+                .map(f => ({path: f.path, data: _eval(opts.files[f.path])}));
 
             return lib.read(opts.introspection.map(makeFileEntity))
                 .then(res => res.map(f => ({path: f.path, data: f.data})).should.eql(result));
@@ -76,11 +75,17 @@ describe('parse', function() {
             const deps = opts.deps.map(makeFileEntity);
             const result = opts.result;
 
-            const res = lib.parse(opts.deps);
+            const res = lib.parse(deps);
 
-            res.map(f => (f.vertex.entity = f.vertex.entity.valueOf(),
-                    f.dependOn.entity = f.dependOn.entity.valueOf(), f))
-                .should.eql(result.map(f => (f.dependOn.tech = f.dependOn.tech || undefined, f)));
+            res.map(f => {
+                f.vertex.entity = f.vertex.entity.valueOf();
+                f.dependOn.entity = f.dependOn.entity.valueOf();
+                return f;
+            })
+                .should.eql(result.map(f => {
+                    f.dependOn.tech = f.dependOn.tech || null;
+                    return f;
+                }));
         };
     }
 });
@@ -88,7 +93,7 @@ describe('parse', function() {
 describe('graph', function() {
 
     it('should return files for entities in decl without deps', function() {
-        const graph = lib.buildGraph([
+        lib.buildGraph([
             {vertex: {entity: {block: 'b2'}}, dependOn: {entity: {block: 'b3'}}, ordered: true},
             {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b1'}}, ordered: true},
             {vertex: {entity: {block: 'b1'}}, dependOn: {entity: {block: 'b2'}}},

@@ -3,19 +3,17 @@
 const fsp = require('mz/fs');
 
 const decl = require('bem-decl');
-const deps = require('@bem/deps');
-const depsFormatFulfill = require('@bem/deps/lib/formats/deps.js/fulfill');
 const _eval = require('node-eval');
 const BemGraph = require('bem-graph').BemGraph;
 const BemEntityName = require('bem-entity-name');
 
-const declNormalize = decl.normalizer('normalize2');
-const declFulfill = function(nd, scope) {
+const declNormalize = decl.normalizer('v2');
+const declAssign = function(nd, scope) {
     // TODO: использовать здесь deps
-    nd = depsFormatFulfill(nd, scope);
+    nd = decl.assign(nd, scope);
     nd.entity = new BemEntityName(nd.entity);
     return nd;
-}
+};
 
 module.exports = {
     read,
@@ -52,7 +50,7 @@ function read(files) {
 }
 
 /**
- * @param {Array<{entity: BemEntityName, scope: {entity, tech: String}, data: *>} depsData
+ * @param {Array<{entity: BemEntityName, scope: {entity, tech: String}, data: *}>} depsData - List of deps
  * @returns {Array<*>}
  */
 function parse(depsData) {
@@ -68,7 +66,7 @@ function parse(depsData) {
         data.forEach(dep => {
             if (dep.mustDeps) {
                 declNormalize(dep.mustDeps).forEach(function (nd) {
-                    nd = declFulfill(nd, scope);
+                    nd = declAssign(nd, scope);
                     const key = declKey(nd);
                     if (!mustDepsIndex[key]) {
                         mustDeps.push({vertex: scope, dependOn: nd, ordered: true});
@@ -78,7 +76,7 @@ function parse(depsData) {
             }
             if (dep.shouldDeps) {
                 declNormalize(dep.shouldDeps).forEach(function (nd) {
-                    nd = declFulfill(nd, scope);
+                    nd = declAssign(nd, scope);
                     const key = declKey(nd);
                     if (!shouldDepsIndex[key]) {
                         shouldDeps.push({vertex: scope, dependOn: nd});
@@ -88,7 +86,7 @@ function parse(depsData) {
             }
             if (dep.noDeps) {
                 declNormalize(dep.noDeps).forEach(function (nd) {
-                    nd = declFulfill(nd, scope);
+                    nd = declAssign(nd, scope);
                     removeFromDeps(nd, mustDepsIndex, mustDeps);
                     removeFromDeps(nd, shouldDepsIndex, shouldDeps);
                 });
@@ -118,8 +116,7 @@ function parse(depsData) {
 }
 
 /**
- * S dnem rozhdeniya
- * @param {Array<{vertex: Tenorok, dependOn: Tenorok, ordered: Boolean}>} dep
+ * @param {Array<{vertex: Tenorok, dependOn: Tenorok, ordered: Boolean}>} deps - List of deps
  * @returns {BemGraph}
  */
 function buildGraph(deps) {
