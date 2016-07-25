@@ -10,6 +10,7 @@ const lib = require('../');
 const chai = require('chai');
 chai.should();
 
+describe('filesToStream', () => {
 it('should return stream of files with contents', function() {
     return checkFn({
         files: ['l1/f1.js', 'l1/f2.js'],
@@ -25,6 +26,7 @@ it('should return stream of files without contents if read=false', function() {
         options: {read: false},
         result: {'l1/f1.js': null, 'l1/f2.js': null}
     });
+});
 });
 
 afterEach(mockfs.restore);

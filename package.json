@@ -42,7 +42,8 @@
     "sinon": "^1.17.4"
   },
   "scripts": {
-    "test": "npm run lint",
+    "pretest": "npm run lint",
+    "test": "mocha",
     "lint": "eslint ."
   }
 }

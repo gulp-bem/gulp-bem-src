@@ -10,6 +10,7 @@ const lib = require('../');
 const chai = require('chai');
 chai.should();
 
+describe('src', () => {
 it('should return files for entities in decl without deps', function() {
     return checkSrc({
         files: ['l1/b2/b2.js', 'l2/b1/b1.js', 'l2/b1/b1.css', 'l1/b1/b1.js', 'l2/b1/b1.es'],
@@ -37,6 +38,7 @@ it('should return something', function() {
 });
 
 afterEach(mockfs.restore);
+});
 
 function checkSrc(opts) {
     const files = Array.isArray(opts.files)
