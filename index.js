@@ -1,8 +1,5 @@
 const assert = require('assert');
 
-const fsp = require('mz/fs');
-
-const BemGraph = require('bem-graph').BemGraph;
 const BemEntityName = require('bem-entity-name');
 const bemDecl = require('bem-decl');
 const bemConfig = require('bem-config');
@@ -15,6 +12,7 @@ const bubbleStreamError = require('bubble-stream-error');
 
 const bemDeclNormalize = bemDecl.normalizer('normalize2');
 const depsFulfill = require('@bem/deps/lib/formats/deps.js/fulfill.js');
+const deps = require('./deps');
 
 module.exports = src;
 
@@ -58,51 +56,44 @@ src(sources: String[], decl: BemEntityName[], techs: String|String[], [, options
  * @param {?Object<String, String[]>} options.techAliases - tech to aliases map to fit needs for everyone
  * @returns {Stream<Vinyl>} - Just a typical stream of gulp-like file objects
  */
-function src(sources, decl, techs, options) {
+function src(sources, decl, tech, options) {
     assert(Array.isArray(sources) && sources.length, 'Sources required to get some files');
     assert(Array.isArray(decl) && decl.length, 'Declaration required to harvest some entities');
-    assert((typeof techs === 'string' || Array.isArray(techs)) && techs.length, 'Techs required to build exactly some');
-    Array.isArray(techs) || (techs = [techs]);
+    assert(tech && typeof tech === 'string', 'Tech required and should be a string to build exactly some');
 
     options || (options = {});
+    options.techMap || (options.techMap = {});
 
     const config = options.config || bemConfig();
 
     // Получаем слепок файловой структуры с уровней
     const introspection = Promise.resolve(config.levelMap ? config.levelMap() : {})
         .then(levelMap => toArray(walk(sources, {levels: levelMap})))
-        .then(files => (
-            files.forEach(fe => fe.entity = new BemEntityName(fe.entity)),
-                files));
+        .then(files => (files.forEach(fe => fe.entity = new BemEntityName(fe.entity)), files));
 
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
-    const depsJsData = introspection.then(files =>
-        Promise.all(files
+    const depsData = introspection.then(files =>
+        files
+            // Получаем deps.js
             .filter(f => f.tech === 'deps.js')
-            .map(f => fsp.readFile(f, 'utf8')
-                .then(content => _eval(content, f.path))
-                .catch(err => null)
-                .then(content => ({
-                    data: content,
-                    level: f.level,
-                    scope: f.entity.valueOf()
-                }))
-            )))
-        // Сортируем по уровням
-        .then(files => files.sort((f1, f2) => (sources.indexOf(f1.level) - sources.indexOf(f2.level))));
+            // Сортируем по уровням
+            .sort((f1, f2) => (sources.indexOf(f1.level) - sources.indexOf(f2.level))))
+        // Читаем и исполняем
+        .then(deps.read)
+        .then(deps.parse);
 
     // Получаем граф с помощью bem-deps
-    const graph = depsJsData.then(buildGraphByIntrospection);
+    const graph = depsData.then(deps.buildGraph);
 
     // Раскрываем декларацию с помощью графа
     const filedecl = graph
-        .then(data => {
+        .then(graph => {
             const fulldecl = graph.dependenciesOf(decl, tech);
             fulldecl.forEach(fe => fe.entity = new BemEntityName(fe.entity));
             return fulldecl;
         })
         // Преобразуем технологии зависимостей в декларации в технологии файловой системы
-        .then(fulldecl => _multiflyTechs(fulldecl, techs));
+        .then(fulldecl => _multiflyTechs(fulldecl, (options.techMap && options.techMap[tech]) || [tech]));
 
     // Формируем упорядоченный список файлов по раскрытой декларации и интроспекции
     const orderedFilesPromise = Promise.all([introspection, filedecl])
@@ -115,48 +106,6 @@ function src(sources, decl, techs, options) {
 
     // Читаем файлы из списка в поток
     return filesToStream(orderedFilesPromise, options);
-}
-
-// bem-deps shit
-function buildGraphByIntrospection(files) {
-    const graph = new BemGraph();
-
-    deps.read(data)
-        // normalized deps
-        .forEach(item => {
-            // item.entity // kto
-            // item.dependOn // ot checgo
-            // item.ordered
-            graph.vertex(item.entity)
-                .dependOn(item.dependOn);
-        });
-
-    return graph;
-
-    files.forEach(f => {
-        const depsData = depsNormalize(f.data, f.scope); // DUCK
-        depsData.forEach(chunk => {
-            console.log(chunk);
-            chunk.shouldDeps.forEach(ent => ent);
-            chunk.mustDeps.forEach(ent => ent);
-        });
-//        console.log('deps', depsData);
-    });
-}
-
-function depsNormalize(data, fileScope) {
-    return [].concat(data).map(chunk => {
-        ['mustDeps', 'shouldDeps', 'noDeps'].forEach(function (depsType) {
-            if (!chunk[depsType]) return (chunk[depsType] = []);
-
-            const scope = Object.assign({}, fileScope, chunk);
-            console.log('!!');
-            chunk[depsType] = bemDeclNormalize(chunk[depsType]);
-            console.log('!!', chunk[depsType].map(e => depsFulfill(e, scope)));
-        });
-
-        return chunk;
-    });
 }
 
 /**
@@ -184,7 +133,7 @@ function filesToStream(files, options) {
                 //     vf.level = file.level;
                 //     vf.tech = file.tech;
                 // }
-                stream.push(vf)
+                stream.push(vf);
             });
             stream.push(null);
         })
@@ -235,10 +184,9 @@ function _buildIndex(list, hash) {
 }
 
 function _multiflyTechs(decl, techs) {
+    Array.isArray(techs) || (techs = [techs]);
     return decl.reduce((res, fileEntity) => {
-        fileEntity.tech
-            ? res.push(fileEntity)
-            : techs.forEach(tech => res.push(Object.assign({tech}, fileEntity)));
+        techs.forEach(tech => res.push(Object.assign({}, fileEntity, {tech})));
         return res;
     }, []);
 }
