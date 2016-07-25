@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 
 const mockfs = require('mock-fs');
 const toArray = require('stream-to-array');
@@ -41,7 +40,7 @@ afterEach(mockfs.restore);
 
 function checkSrc(opts) {
     const files = Array.isArray(opts.files)
-        ? opts.files.reduce((res, f, idx) => (res[f] = String(idx), res), {})
+        ? opts.files.reduce((res, f, idx) => { res[f] = String(idx); return res; }, {})
         : opts.files;
 
     mockfs(files);
@@ -51,7 +50,7 @@ function checkSrc(opts) {
 
     const config = {
         levelMap: () => Promise.resolve(
-            opts.levels.reduce((res, path) => (res[path] = {}, res), {})),
+            opts.levels.reduce((res, path) => { res[path] = {}; return res; }, {})),
     };
 
     return toArray(lib(opts.levels, opts.decl, opts.tech, {config, techMap: opts.techMap}))

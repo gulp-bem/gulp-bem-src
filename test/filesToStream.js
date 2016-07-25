@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 
 const mockfs = require('mock-fs');
 const toArray = require('stream-to-array');
@@ -31,7 +30,7 @@ it('should return stream of files without contents if read=false', function() {
 afterEach(mockfs.restore);
 
 function checkFn(opts) {
-    const fsFiles = opts.fsFiles || opts.files.reduce((res, f, idx) => (res[f] = String(idx), res), {});
+    const fsFiles = opts.fsFiles || opts.files.reduce((res, f, idx) => { res[f] = String(idx); return res; }, {});
     mockfs(fsFiles);
 
     opts.options || (opts.options = {read: true});
@@ -39,7 +38,8 @@ function checkFn(opts) {
 
     return toArray(lib.filesToStream(opts.files, opts.options))
         .then(res => {
-            res.reduce((res, f) => (res[f.path] = f.contents && String(f.contents), res), {}).should.eql(opts.result);
+            res.reduce((res, f) => { res[f.path] = f.contents && String(f.contents); return res; }, {})
+                .should.eql(opts.result);
         });
 }
 

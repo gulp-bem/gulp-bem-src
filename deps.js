@@ -3,7 +3,7 @@
 const fsp = require('mz/fs');
 
 const decl = require('bem-decl');
-const deps = require('@bem/deps');
+// const deps = require('@bem/deps');
 const depsFormatFulfill = require('@bem/deps/lib/formats/deps.js/fulfill');
 const _eval = require('node-eval');
 const BemGraph = require('bem-graph').BemGraph;
@@ -52,7 +52,7 @@ function read(files) {
 }
 
 /**
- * @param {Array<{entity: BemEntityName, scope: {entity, tech: String}, data: *>} depsData
+ * @param {Array<{entity: BemEntityName, scope: {entity, tech: String}, data: *}>} depsData - List of deps
  * @returns {Array<*>}
  */
 function parse(depsData) {
@@ -118,8 +118,7 @@ function parse(depsData) {
 }
 
 /**
- * S dnem rozhdeniya
- * @param {Array<{vertex: Tenorok, dependOn: Tenorok, ordered: Boolean}>} dep
+ * @param {Array<{vertex: Tenorok, dependOn: Tenorok, ordered: Boolean}>} deps - List of deps
  * @returns {BemGraph}
  */
 function buildGraph(deps) {
