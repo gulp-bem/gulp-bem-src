@@ -6,6 +6,7 @@ const lib = require('../');
 
 chai.should();
 
+describe('harvest', function() {
 it('should filter introspection by entity and tech', function() {
     checkHarvest({
         files: ['l1/b2/b2.js', 'l1/b2/b2.css', 'l1/b3/b3.js'],
@@ -49,6 +50,7 @@ it('should filter introspection and sort by level for few declarations', functio
         decl: ['b1.js', 'b2.css', 'b3.js'],
         result: ['l1/b1/b1.js', 'l3/b2/b2.css', 'l2/b2/b2.css', 'l1/b2/b2.css', 'l4/b2/b2.css', 'l2/b3/b3.js']
     });
+});
 });
 
 // ['b1/b1.js', 'b2/b2.js', 'b3/b3.js']

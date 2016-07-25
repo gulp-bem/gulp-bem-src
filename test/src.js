@@ -11,7 +11,7 @@ const lib = require('../');
 const chai = require('chai');
 chai.should();
 
-it.only('should return files for entities in decl without deps', function() {
+it('should return files for entities in decl without deps', function() {
     return checkSrc({
         files: ['l1/b2/b2.js', 'l2/b1/b1.js', 'l2/b1/b1.css', 'l1/b1/b1.js', 'l2/b1/b1.es'],
         decl: ['b1', 'b2'],
