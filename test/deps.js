@@ -83,7 +83,7 @@ describe('parse', function() {
                 return f;
             })
                 .should.eql(result.map(f => {
-                    f.dependOn.tech = f.dependOn.tech || undefined;
+                    f.dependOn.tech = f.dependOn.tech || null;
                     return f;
                 }));
         };
