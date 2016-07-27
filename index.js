@@ -1,7 +1,9 @@
+'use strict';
+
 const assert = require('assert');
+const path = require('path');
 
 const BemEntityName = require('bem-entity-name');
-// const bemDecl = require('bem-decl');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
@@ -69,7 +71,12 @@ function src(sources, decl, tech, options) {
     // Получаем слепок файловой структуры с уровней
     const introspection = Promise.resolve(config.levelMap ? config.levelMap() : {})
         .then(levelMap => toArray(walk(sources, {levels: levelMap})))
-        .then(files => (files.forEach(fe => { fe.entity = new BemEntityName(fe.entity); }), files));
+        .then(files => {
+            files.forEach(fe => {
+                fe.entity = new BemEntityName(fe.entity);
+            });
+            return files;
+        });
 
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
     const depsData = introspection.then(files =>
@@ -89,7 +96,9 @@ function src(sources, decl, tech, options) {
     const filedecl = graph
         .then(graph => {
             const fulldecl = graph.dependenciesOf(decl, tech);
-            fulldecl.forEach(fe => { fe.entity = new BemEntityName(fe.entity); });
+            fulldecl.forEach(fe => {
+                fe.entity = new BemEntityName(fe.entity);
+            });
             return fulldecl;
         })
         // Преобразуем технологии зависимостей в декларации в технологии файловой системы
@@ -117,32 +126,45 @@ function filesToStream(files, options) {
     const stream = thru.obj();
 
     options = Object.assign({
-        read: true,
-//        bem: false
+        read: true
+        // bem: false
     }, options);
 
     Promise.resolve(files)
-        .then(files => {
-            files.forEach(file => {
+        .then(files => new Promise((resolve) => {
+            let i = 0;
+            const l = files.length;
+
+            (function next() {
+                if (i >= l) {
+                    stream.push(null);
+                    resolve();
+                    return;
+                }
+
+                const file = files[i++];
                 const vf = new File({
-//                    base: file.level,
+                    base: file.level,
                     path: file.path,
                     contents: null
                 });
+
                 // if (options.bem) {
-                //     vf.level = file.level;
-                //     vf.tech = file.tech;
+                    vf.name = path.basename(file.path).split('.')[0];
+                    vf.tech = file.tech;
+                    vf.level = file.level;
                 // }
+
                 stream.push(vf);
-            });
-            stream.push(null);
-        })
+                process.nextTick(next);
+            }());
+        }))
         .catch(err => {
             stream.emit('error', err);
             stream.push(null);
         });
 
-    var result = stream;
+    let result = stream;
 
     if (options.read) {
         const reader = read();

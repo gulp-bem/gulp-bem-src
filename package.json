@@ -18,7 +18,6 @@
     "node": ">= 4.0"
   },
   "dependencies": {
-    "@bem/deps": "bem-sdk/bem-deps#a9ec4b0e091bc82cad9a3f9ae1a0e135b2e8c572",
     "bem-bundle": "^0.1.0",
     "bem-decl": "bem-sdk/bem-decl#v0.2.0",
     "bem-graph": "bem-sdk/bem-graph#1bc3408",
