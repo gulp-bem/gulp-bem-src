@@ -27,6 +27,14 @@ it('should return stream of files without contents if read=false', function() {
         result: {'l1/f1.js': null, 'l1/f2.js': null}
     });
 });
+
+it('should return empty stream of files', function() {
+    return checkFn({
+        files: [],
+        fsFiles: {},
+        result: {}
+    });
+});
 });
 
 afterEach(mockfs.restore);

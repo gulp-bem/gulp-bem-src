@@ -70,7 +70,17 @@ function src(sources, decl, tech, options) {
 
     // Получаем слепок файловой структуры с уровней
     const introspection = Promise.resolve(config.levelMap ? config.levelMap() : {})
-        .then(levelMap => toArray(walk(sources, {levels: levelMap})))
+        .then(levelMap => {
+            const intro = walk(sources, {levels: levelMap});
+
+            let hasSomeData = false;
+            intro.on('data', () => { hasSomeData = true; });
+            return new Promise((resolve, reject) => {
+                setTimeout(() => hasSomeData ||
+                    reject('bem-walk timeout. See also https://github.com/bem-sdk/bem-walk/issues/76'), 1000);
+                toArray(intro).then(resolve).catch(reject);
+            });
+        })
         .then(files => {
             files.forEach(fe => {
                 fe.entity = new BemEntityName(fe.entity);

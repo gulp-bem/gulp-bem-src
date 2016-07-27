@@ -11,6 +11,18 @@ const chai = require('chai');
 chai.should();
 
 describe('src', () => {
+
+// Skipped because of https://github.com/bem-sdk/bem-walk/issues/76
+it.skip('should return no files if no files', function() {
+    return checkSrc({
+        files: {l1: {}, l2: {}},
+        decl: ['b1', 'b2'],
+        levels: ['l1', 'l2'],
+        tech: 'js',
+        result: []
+    });
+});
+
 it('should return files for entities in decl without deps', function() {
     return checkSrc({
         files: ['l1/b2/b2.js', 'l2/b1/b1.js', 'l2/b1/b1.css', 'l1/b1/b1.js', 'l2/b1/b1.es'],
