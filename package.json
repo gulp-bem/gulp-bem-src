@@ -19,7 +19,6 @@
     "node": ">= 4.0"
   },
   "dependencies": {
-    "bem-bundle": "^0.1.0",
     "bem-config": "^2.0.1",
     "bem-decl": "bem-sdk/bem-decl#v0.2.0",
     "bem-entity-name": "0.0.1",
