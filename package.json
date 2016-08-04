@@ -37,8 +37,8 @@
   "devDependencies": {
     "bem-naming": "^1.0.1",
     "chai": "^3.5.0",
-    "eslint": "2.6.0",
-    "eslint-config-pedant": "0.1.1",
+    "eslint": "3.0.0",
+    "eslint-config-pedant": "0.7.0",
     "mocha": "^2.5.3",
     "mock-fs": "^3.11.0",
     "sinon": "^1.17.4"

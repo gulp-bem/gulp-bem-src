@@ -14,7 +14,7 @@ describe('read', function() {
 
     it('should return files for entities in decl without deps', check({
         files: {
-            'l1/b2/b2.deps.js': `[{shouldDeps: {block: 'b3'}}]`,
+            'l1/b2/b2.deps.js': `[{shouldDeps: {block: 'b3'}}]`
         },
         introspection: ['l1/b2/b2.deps.js'],
         result: ['l1/b2/b2.deps.js']
@@ -66,7 +66,7 @@ describe('parse', function() {
             {vertex: {entity: {block: 'b2'}}, dependOn: {entity: {block: 'b3'}}, ordered: true},
             {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b1'}}, ordered: true},
             {vertex: {entity: {block: 'b1'}}, dependOn: {entity: {block: 'b2'}}},
-            {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b4'}}},
+            {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b4'}}}
         ]
     }));
 
@@ -97,7 +97,7 @@ describe('graph', function() {
             {vertex: {entity: {block: 'b2'}}, dependOn: {entity: {block: 'b3'}}, ordered: true},
             {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b1'}}, ordered: true},
             {vertex: {entity: {block: 'b1'}}, dependOn: {entity: {block: 'b2'}}},
-            {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b4'}}},
+            {vertex: {entity: {block: 'b3'}}, dependOn: {entity: {block: 'b4'}}}
         ]);
 
         // hm
