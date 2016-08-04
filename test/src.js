@@ -64,7 +64,7 @@ function checkSrc(opts) {
 
     const config = {
         levelMap: () => Promise.resolve(
-            opts.levels.reduce((res, path) => { res[path] = {}; return res; }, {})),
+            opts.levels.reduce((res, path) => { res[path] = {}; return res; }, {}))
     };
 
     return toArray(lib(opts.levels, opts.decl, opts.tech, {config, techMap: opts.techMap}))
