@@ -21,7 +21,7 @@
   "dependencies": {
     "bem-config": "^2.0.1",
     "bem-decl": "bem-sdk/bem-decl#v0.2.0",
-    "bem-deps": "bem-sdk/bem-deps#issue#73",
+    "@bem/deps": "bem-sdk/bem-deps#issue#73",
     "bem-entity-name": "0.0.1",
     "bem-graph": "bem-sdk/bem-graph#1bc3408",
     "bem-walk": "1.0.0-alpha1",

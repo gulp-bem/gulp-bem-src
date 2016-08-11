@@ -89,11 +89,11 @@ function src(sources, decl, tech, options) {
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
     const depsData = introspection.then(files =>
         files
-        // Получаем deps.js
+            // Получаем deps.js
             .filter(f => f.tech === 'deps.js')
             // Сортируем по уровням
             .sort((f1, f2) => (sources.indexOf(f1.level) - sources.indexOf(f2.level))))
-    // Читаем и исполняем
+        // Читаем и исполняем
         .then(deps.read())
         .then(deps.parse());
 
