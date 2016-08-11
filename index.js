@@ -12,9 +12,7 @@ const thru = require('through2');
 const read = require('gulp-read');
 const bubbleStreamError = require('bubble-stream-error');
 
-// const bemDeclNormalize = bemDecl.normalizer('normalize2');
-// const depsFulfill = require('@bem/deps/lib/formats/deps.js/fulfill.js');
-const deps = require('./deps');
+const deps = require('@bem/deps');
 
 module.exports = src;
 
@@ -91,17 +89,16 @@ function src(sources, decl, tech, options) {
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
     const depsData = introspection.then(files =>
         files
-            // Получаем deps.js
+        // Получаем deps.js
             .filter(f => f.tech === 'deps.js')
             // Сортируем по уровням
             .sort((f1, f2) => (sources.indexOf(f1.level) - sources.indexOf(f2.level))))
-        // Читаем и исполняем
-        .then(deps.read)
-        .then(deps.parse);
+    // Читаем и исполняем
+        .then(deps.read())
+        .then(deps.parse());
 
     // Получаем граф с помощью bem-deps
     const graph = depsData.then(deps.buildGraph);
-
     // Раскрываем декларацию с помощью графа
     const filedecl = graph
         .then(graph => {
@@ -154,6 +151,7 @@ function filesToStream(files, options) {
 
                 const file = files[i++];
                 const vf = new File({
+                    name: '',
                     base: file.level,
                     path: file.path,
                     contents: null
