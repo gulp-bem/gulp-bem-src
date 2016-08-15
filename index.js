@@ -193,11 +193,21 @@ function harvest(introspection, levels, decl/*: Array<{entity, tech}>*/) {
     const hash = fileEntity => `${fileEntity.entity.id}.${fileEntity.tech}`;
     const declIndex = _buildIndex(decl, hash);
 
+    let boolMods = {};
+
     const entityInIndex = file => {
-        return (declIndex[hash(file)] !== undefined || (file.entity.modName && file.entity.modVal === true));
+        return ((declIndex[hash(file)] !== undefined) || (boolMods[file.entity.mod.name] === file.tech));
     };
 
     return introspection
+        .map(file => {
+            if (file.entity.mod.name && file.entity.mod.val === true) {
+                if (declIndex[hash(file)] !== undefined) {
+                    boolMods[file.entity.mod.name] = file.tech;
+                }
+            }
+            return file;
+        })
         .filter(entityInIndex)
         .filter(file => levels.indexOf(file.level) !== -1)
         .sort((f1, f2) => hash(f1) === hash(f2)
