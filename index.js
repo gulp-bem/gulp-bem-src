@@ -210,9 +210,11 @@ function harvest(introspection, levels, decl/*: Array<{entity, tech}>*/) {
         })
         .filter(entityInIndex)
         .filter(file => levels.indexOf(file.level) !== -1)
-        .sort((f1, f2) => hash(f1) === hash(f2)
+        .sort((f1, f2) => {
+            return hash(f1) === hash(f2)
             ? levels.indexOf(f1.level) - levels.indexOf(f2.level)
-            : declIndex[hash(f1)] - declIndex[hash(f2)]);
+            : declIndex[hash(f1)] - declIndex[hash(f2)];
+        })
 }
 
 /**
