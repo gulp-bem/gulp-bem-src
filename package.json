@@ -21,7 +21,7 @@
     "bem-config": "^2.0.1",
     "bem-decl": "0.2.1",
     "@bem/deps": "bem-sdk/bem-deps#issue#73",
-    "bem-entity-name": "0.0.1",
+    "bem-entity-name": "0.0.2",
     "bem-walk": "1.0.0-alpha1",
     "bubble-stream-error": "^1.0.0",
     "gulp-read": "0.0.1",
