@@ -49,6 +49,21 @@ describe('src', () => {
         });
     });
 
+    it('should not stop on directories', function() {
+        return checkSrc({
+            files: {
+                'l1/b1/b1.deps.js': `[{shouldDeps: {block: 'b2'}}]`,
+                'l1/b1/b1.i18n/ru.js': `1`,
+                'l1/b2/b2.i18n/ru.js': `2`
+            },
+            decl: ['b1'],
+            levels: ['l1'],
+            tech: 'i18n',
+            result: ['l1/b1/b1.i18n', 'l1/b2/b2.i18n'],
+            read: true
+        });
+    });
+
     afterEach(mockfs.restore);
 });
 
@@ -76,7 +91,7 @@ function checkSrc(opts) {
     return toArray(lib(opts.levels, opts.decl, opts.tech, {config, techMap: opts.techMap}))
         .then(res => {
             res.map(f => ({path: f.path, contents: f.contents && String(f.contents)}))
-                .should.eql(opts.result.map(f => ({path: f.path, contents: files[f.path]})));
+                .should.eql(opts.result.map(f => ({path: f.path, contents: files[f.path] || null})));
         });
 }
 

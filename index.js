@@ -3,14 +3,14 @@
 const assert = require('assert');
 const path = require('path');
 
+const fs = require('graceful-fs');
+const inParallel = require('run-parallel-limit');
 const BemEntityName = require('bem-entity-name');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
 const toArray = require('stream-to-array');
 const thru = require('through2');
-const read = require('gulp-read');
-const bubbleStreamError = require('bubble-stream-error');
 
 const deps = require('@bem/deps');
 
@@ -155,17 +155,8 @@ function filesToStream(filesPromise, options) {
 
     Promise.resolve(filesPromise)
         .then(files => new Promise((resolve) => {
-            let i = 0;
-            const l = files.length;
-
-            (function next() {
-                if (i >= l) {
-                    stream.push(null);
-                    resolve();
-                    return;
-                }
-
-                const file = files[i++];
+            const vfiles = [];
+            files.forEach(file => {
                 const vf = new File({
                     name: '',
                     base: file.level,
@@ -178,24 +169,36 @@ function filesToStream(filesPromise, options) {
                 vf.level = file.level;
                 vf.entity = file.entity;
 
+                vfiles.push(vf);
                 stream.push(vf);
-                process.nextTick(next);
-            }());
+            });
+
+            if (!options.read) {
+                stream.push(null);
+                resolve();
+                return;
+            }
+
+            _readFiles(files.map(f => f.path), {encoding: options.encoding, limit: options.limit}, (err, res) => {
+                if (err) {
+                    console.error(err.stack);
+                    stream.emit('error', err);
+                    stream.push(null);
+                    resolve();
+                    return;
+                }
+                res.forEach((contents, k) => { vfiles[k].contents = contents; });
+                stream.push(null);
+                resolve();
+            });
+
         }))
         .catch(err => {
             stream.emit('error', err);
             stream.push(null);
         });
 
-    let result = stream;
-
-    if (options.read) {
-        const reader = read();
-        bubbleStreamError(stream, reader);
-        result = stream.pipe(reader);
-    }
-
-    return result;
+    return stream;
 }
 
 /**
@@ -235,4 +238,28 @@ function _multiflyTechs(decl, techMap) {
         techs.forEach(tech => res.push(Object.assign({}, fileEntity, {tech})));
         return res;
     }, []);
+}
+
+function _readFiles(files, opts, cb) {
+    if (!files.length) {
+        return cb(null, []);
+    }
+
+    opts || (opts = {});
+    typeof opts === 'string' && (opts = {encoding: opts});
+    //console.log(fs.readdirSync(path.dirname(files[0])), files[0]);
+    inParallel(files.map(f => (next =>
+        tryCatch(() => fs.readFile(f, opts, next), e => {
+            console.log('??zxczxc', e);
+            next(e);
+        }))),
+            opts.limit || 1, cb);
+}
+
+function tryCatch(fn, cb) {
+    try {
+        return fn();
+    } catch(e) {
+        return cb(e);
+    }
 }
