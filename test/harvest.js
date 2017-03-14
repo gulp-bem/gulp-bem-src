@@ -57,8 +57,8 @@ it('should resolve techs usign techMap with right order', function() {
         files: ['l1/b1/b1.js', 'l2/b1/b1.vanilla.js', 'l3/b1/b1.js', 'l4/b1/b1.vanilla.js'],
         levels: ['l3', 'l2', 'l1', 'l4'],
         decl: ['b1.js'],
-        techMap: {js: ['js', 'vanilla.js']},
-        result: ['l3/b1/b1.js', 'l2/b1/b1.vanilla.js', 'l1/b1/b1.js', 'l4/b1/b1.vanilla.js']
+        techMap: {js: ['vanilla.js']},
+        result: ['l2/b1/b1.vanilla.js', 'l4/b1/b1.vanilla.js']
     });
 });
 });
