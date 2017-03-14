@@ -124,17 +124,14 @@ function src(sources, decl, tech, options) {
         return stream;
     }
 
-    const fullfiledeclP = filedeclP
-        // Преобразуем технологии зависимостей в декларации в технологии файловой системы
-        .then(fulldecl => _multiflyTechs(fulldecl, techMap));
-
     // Формируем упорядоченный список файлов по раскрытой декларации и интроспекции
-    const orderedFilesPromise = Promise.all([introspectionP, fullfiledeclP])
+    const orderedFilesPromise = Promise.all([introspectionP, filedeclP])
         .then(data => {
             const introspection = data[0];
             const filedecl = data[1];
 
-            return harvest(introspection, sources, filedecl);
+            // Преобразуем технологии зависимостей в декларации в технологии файловой системы
+            return harvest({introspection, levels: sources, decl: filedecl, techMap});
         });
 
     // Читаем файлы из списка в поток
@@ -199,40 +196,42 @@ function filesToStream(filesPromise, options) {
 }
 
 /**
- * @param {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} introspection - unordered file-entities list
- * @param {String[]} levels - ordered levels' paths list
- * @param {Tenorok[]} decl - resolved and ordered declaration
+ * @param {Object} opts - Options for harvester
+ * @param {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} opts.introspection - unordered file-entities list
+ * @param {String[]} opts.levels - ordered levels' paths list
+ * @param {Object<String, String[]>} [opts.techMap] - deps techs to file techs mapper
+ * @param {BemCell[]} opts.decl - resolved and ordered declaration
  * @returns {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} - resulting ordered file-entities list
  */
-function harvest(introspection, levels, decl/*: Array<{entity, tech}>*/) {
-    const hash = fileEntity => `${fileEntity.entity.id}.${fileEntity.tech}`;
-    const declIndex = _buildIndex(decl, hash);
+function harvest(opts) {
+    const hash = cell => `${cell.entity.id}.${cell.tech}`;
+    const declIndex = _buildIndex(opts.decl, hash);
 
-    const entityInIndex = file => declIndex[hash(file)] !== undefined;
-    return introspection
-        .filter(entityInIndex)
-        .filter(file => levels.indexOf(file.level) !== -1)
-        .sort((f1, f2) => hash(f1) === hash(f2)
-            ? levels.indexOf(f1.level) - levels.indexOf(f2.level)
-            : declIndex[hash(f1)] - declIndex[hash(f2)]);
+    const fileTechToDep = Object.keys(opts.techMap || {}).reduce((res, depTech) =>
+        (opts.techMap[depTech].forEach(fileTech => (res[fileTech] = depTech)), res),
+        {});
+
+    return opts.introspection
+        .filter(file => {
+            return declIndex[hash(file)] !== undefined ||
+                fileTechToDep[file.tech] && declIndex[hash(Object.assign({}, file, {tech: fileTechToDep[file.tech]}))] !== undefined;
+        })
+        .filter(file => opts.levels.indexOf(file.level) !== -1)
+        .sort((f1, f2) => f1.entity.id === f2.entity.id && (fileTechToDep[f1.tech] === fileTechToDep[f2.tech])
+            ? (opts.levels.indexOf(f1.level) - opts.levels.indexOf(f2.level))
+                || (opts.techMap[fileTechToDep[f1.tech]].indexOf(f1.tech) - opts.techMap[fileTechToDep[f1.tech]].indexOf(f2.tech))
+            : declIndex[f1.entity.id] - declIndex[f2.entity.id]);
 }
 
 /**
- * @param {Array<{entity: Tenorok, tech: String}>} list - List of tenoroks
+ * @param {BemCell[]} list - List of tenoroks
  * @param {Function} hash - Hashing function
  * @returns {Object<String, Number>} - Entity id to sort order
  */
 function _buildIndex(list, hash) {
-    return list.reduce((res, fileEntity, idx) => {
-        res[hash(fileEntity)] = idx;
+    return list.reduce((res, cell, idx) => {
+        res[cell.entity.id] = idx;
+        res[hash(cell)] = idx;
         return res;
     }, {});
-}
-
-function _multiflyTechs(decl, techMap) {
-    return decl.reduce((res, fileEntity) => {
-        const techs = techMap[fileEntity.tech] || (techMap[fileEntity.tech] = [fileEntity.tech]);
-        techs.forEach(tech => res.push(Object.assign({}, fileEntity, {tech})));
-        return res;
-    }, []);
 }
