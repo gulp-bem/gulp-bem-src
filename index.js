@@ -3,7 +3,8 @@
 const assert = require('assert');
 const path = require('path');
 
-const BemEntityName = require('bem-entity-name');
+const BemCell = require('@bem/cell');
+const BemEntityName = require('@bem/entity-name');
 const bemConfig = require('bem-config');
 const walk = require('bem-walk');
 const File = require('vinyl');
@@ -72,13 +73,13 @@ function src(sources, decl, tech, options) {
         })
         .then(files => {
             files.forEach(fe => {
-                fe.entity = new BemEntityName(fe.entity);
+                fe.entity = BemEntityName.create(fe.entity);
             });
             return files;
         });
 
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
-    const depsData = introspectionP
+    const depsData = options.skipResolvingDependencies ? null : introspectionP
         .then(files => files
             // Получаем deps.js
             .filter(f => f.tech === 'deps.js')
@@ -89,17 +90,17 @@ function src(sources, decl, tech, options) {
         .then(deps.parse());
 
     // Получаем граф с помощью bem-deps
-    const graphP = depsData.then(deps.buildGraph);
+    const graphP = options.skipResolvingDependencies ? null : depsData.then(deps.buildGraph);
 
     // Раскрываем декларацию с помощью графа
-    const filedeclP = graphP
-        .then(graph => {
-            const fulldecl = graph.dependenciesOf(decl, tech);
-            fulldecl.forEach(fe => {
-                fe.entity = new BemEntityName(fe.entity);
-            });
-            return fulldecl;
-        });
+    const filedeclP = (options.skipResolvingDependencies
+        ? Promise.resolve(decl.map(entity => {
+            var e = entity.valueOf();
+            entity = typeof e === 'object' ? e : entity;
+            return Object.assign({}, entity, { tech });
+        }))
+        : graphP.then(graph => graph.dependenciesOf(decl, tech)))
+            .then(entities => entities.map(BemCell.create));
 
     if (options.deps === true) {
         const stream = thru.obj();
