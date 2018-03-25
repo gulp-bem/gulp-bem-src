@@ -15,10 +15,13 @@ const bubbleStreamError = require('bubble-stream-error');
 
 const deps = require('@bem/sdk.deps');
 
+const introCache = {};
+
 module.exports = src;
 
 src.filesToStream = filesToStream;
 src.harvest = harvest;
+
 
 /**
  * Функция для получения файлов по декларации.
@@ -60,16 +63,22 @@ function src(sources, decl, tech, options) {
     // Получаем слепок файловой структуры с уровней
     const introspectionP = Promise.resolve(config.levelMap ? config.levelMap() : {})
         .then(levelMap => {
+            const cache = introCache[sources.join(':')];
+            if (cache) {
+                return cache;
+            }
+
             const intro = walk(sources, {levels: levelMap});
 
             let hasSomeData = false;
             intro.on('data', () => { hasSomeData = true; });
-            return new Promise((resolve, reject) => {
+            introCache[sources.join(':')] = new Promise((resolve, reject) => {
                 setTimeout(() => hasSomeData ||
                     reject('Looks like there are no files. ' +
-                        'See also https://github.com/bem-sdk/bem-walk/issues/76'), 1000);
+                        'See also https://github.com/bem-sdk/bem-walk/issues/76'), 10000);
                 toArray(intro).then(resolve).catch(reject);
             });
+            return introCache[sources.join(':')];
         });
 
     // Получаем и исполняем содержимое файлов ?.deps.js (получаем набор объектов deps)
@@ -151,6 +160,10 @@ function filesToStream(filesPromise, options) {
                 i = 0;
                 files = files_;
                 tryread(this);
+            })
+            .catch(e => {
+                this.emit('error', e);
+                this.push(null);
             });
 
             function tryread(self) {
@@ -214,7 +227,9 @@ function filesToStream(filesPromise, options) {
  * @returns {Array<{entity: BemEntityName, level: String, tech: String, path: String}>} - resulting ordered file-entities list
  */
 function harvest(opts) {
+    const entitySet = new Set;
     const declIndex = opts.decl.reduce((res, cell, idx) => {
+        entitySet.add(cell.entity.id);
         res[cell.entity.id] || (res[cell.entity.id] = {});
         res[cell.entity.id][cell.tech] = idx;
         return res;
@@ -231,8 +246,20 @@ function harvest(opts) {
         return res;
     }, {});
 
+    // Caching time: we can do this because introspection is unordered list anyway
+    if (!opts.introspection.byEntityId) {
+        opts.introspection.byEntityId = {};
+        for (const file of opts.introspection) {
+            const id = file.entity.id;
+            opts.introspection.byEntityId[id] || (opts.introspection.byEntityId[id] = []);
+            opts.introspection.byEntityId[id].push(file);
+        }
+    }
+
+    const files = [].concat.apply([], Array.from(entitySet).map(id => opts.introspection.byEntityId[id] || []));
+
     const res = [], depTechForFile = {};
-    for (const file of opts.introspection) {
+    for (const file of files) {
         if (file.tech && !fileTechToDep[file.tech] && !techMap[file.tech]) {
             techMap[file.tech] = [file.tech];
             fileTechToDep[file.tech] = [file.tech];
