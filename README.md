@@ -1,18 +1,7 @@
 gulp-bem-src
 ============
 
-[![NPM Status][npm-img]][npm]
-[![Travis Status][test-img]][travis]
-[![Coverage Status][coverage-img]][coveralls]
-
-[npm]:          https://www.npmjs.org/package/gulp-bem-src
-[npm-img]:      https://img.shields.io/npm/v/gulp-bem-src.svg
-
-[travis]:       https://travis-ci.org/gulp-bem/gulp-bem-src
-[test-img]:     https://img.shields.io/travis/gulp-bem/gulp-bem-src.svg
-
-[coveralls]:    https://coveralls.io/r/gulp-bem/gulp-bem-src
-[coverage-img]: https://img.shields.io/coveralls/gulp-bem/gulp-bem-src.svg
+*DEPRECATED repository, moved to mono repository [gulp-bem](https://github.com/bem/gulp-bem/tree/master/packages/gulp-bem-src)*
 
 Install
 -------
